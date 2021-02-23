@@ -8,6 +8,7 @@ from pyspark.sql.types import StructType, StringType, IntegerType, \
 
 AWS_ACCESS_KEY_ID = os.environ['AWS_ACCESS_KEY_ID']
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
+AWS_BUCKET = os.environ['AWS_BUCKET']
 
 
 def get_schema():
@@ -54,22 +55,26 @@ def anonymize(sql_context):
 def write_to_s3(df):
     query = df.writeStream \
         .format('parquet') \
-        .option('path', 's3a://kafka-task/output') \
+        .option('path', f's3a://{AWS_BUCKET}/output') \
         .option('checkpointLocation', 'checkpoint') \
         .start()
     query.awaitTermination()
 
 
 if __name__ == "__main__":
+
     spark_conf = SparkConf() \
         .setMaster('local[*]') \
         .setAppName('anonymization_job')
     sc = SparkContext(conf=spark_conf)
+
     hadoopConf = sc._jsc.hadoopConfiguration()
     hadoopConf.set('fs.s3.impl', 'org.apache.hadoop.fs.s3a.S3AFileSystem')
     hadoopConf.set('fs.s3a.endpoint', 's3.us-east-1.amazonaws.com')
+    hadoopConf.set('fs.s3a.multipart.size', '104857600')
     hadoopConf.set('fs.s3a.awsAccessKeyId', AWS_ACCESS_KEY_ID)
     hadoopConf.set('fs.s3a.awsSecretAccessKey', AWS_SECRET_ACCESS_KEY)
     sql_context = SQLContext(sc)
+
     df = anonymize(sql_context)
     write_to_s3(df)

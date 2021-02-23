@@ -1,0 +1,43 @@
+version: "3"
+
+services:
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    build:
+      context: ./wurstmeister-kafka
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_CREATE_TOPICS: "events:1:1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    ports:
+      - "9092:9092"
+
+  kafka-producer-service:
+    build:
+      context: ./kafka-producer-service
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+      - zookeeper
+
+  spark-anonymizer:
+    build:
+      context: ./spark-anonymizer
+    restart: always
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_BUCKET
+    ports:
+      - "4040:4040"
+      - "9090:8080"
+    depends_on:
+      - kafka
+      - zookeeper
